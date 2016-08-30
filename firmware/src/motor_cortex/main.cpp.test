@@ -1,0 +1,244 @@
+
+#include "Arduino.h"
+
+void isr(); 
+void serialEvent();
+void prepareForCommand(); 
+void runCommand();
+void loadCommand(int addr, int data);
+void setAllHigh();
+void printPorts();
+byte readDataBus();
+
+
+// Haven't reconciled the following 3 comments against the updated wiring - trust at your own risk!
+// Address bus A0 - A7 A8 - A15
+// PC0 - PC7   PL0 - PL7
+// Data bus  D0 - D7 = PA0 - PA7 
+
+
+
+
+#define MAX_INPUT_LEN 5
+#define WRITE_DELAY 10
+
+
+// Let's define some pins
+const byte RE = 4;
+const byte RW = 5;
+const byte VMA = 6;
+
+
+const byte interruptPin = 2;  // listen for interrupts on raybot on this pin
+volatile byte intState = LOW; // this is the current state of the interrupt
+volatile byte lastIrq = 0;
+
+
+char inBuf[MAX_INPUT_LEN] = {'\0'};      
+int index = 0;
+
+
+String inputStr = "";             // a string to hold incoming data
+boolean serialCmdReady = false;   // whether a serial command is waiting to processs
+
+
+String hexStr;                    // keep a hex version of our string 
+long address, data;               // address and data values as converted from hexStr
+
+
+void setup() 
+{  
+  // Turn the Serial Protocol ON
+  Serial.begin(115200);
+  Serial.println("Listening for serial commands...");
+ 
+  // Get all the pins in the right state OR IT WONT WORK and many cries.
+  // Kudos to fauxtonic for catching this and saving the day!
+  pinMode(RW,OUTPUT);
+  pinMode(VMA,OUTPUT);
+  pinMode(RE,OUTPUT);
+ 
+  // set pinMode for ports all at once:
+  DDRA = B11111111;
+  DDRC = B11111111;
+  DDRL = B11111111;
+
+  pinMode(interruptPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(interruptPin), isr, CHANGE);
+  
+  inputStr.reserve(256);
+  hexStr.reserve(4);
+}
+
+
+
+
+/* 
+    Current Operation:
+    Wait until a string is detected on serial, then decode and execute.
+    /fetter
+*/
+
+
+void loop() 
+{ 
+  // NOTE: If using serial monitor, make sure dropdown in bottom right is set to newline!!!
+  if (serialCmdReady) { 
+    //Serial.print("Caught serial command: ");
+    //Serial.print(inputStr);
+    
+    //if(!(inputStr.length() % 2)) { // make sure is always multipe of 2 - this version for one off cmds
+    if(inputStr.length() == 7) {
+      inputStr[6]='\0';
+      //Serial.print("\tDecoded: ");
+      // extract address portion from command and convert to hex value
+      hexStr = inputStr.substring(0,4);
+      //Serial.print("hex string:");
+      //Serial.println(hexStr);
+      address = strtol(&hexStr[0], NULL, 16);
+      //Serial.print("address: ");
+      //Serial.print(address,HEX);
+      
+      // extract data portion from command and convert to hex value
+      hexStr = inputStr.substring(4,6);
+      //Serial.print("hex string:");
+      //Serial.println(hexStr);  
+      data = strtol(&hexStr[0], NULL, 16);
+      //Serial.print(" data: ");
+      //Serial.println(data, HEX);  
+    
+      prepareForCommand();        // Ready raybot to load and read a command
+      loadCommand(address, data); // load the command
+      runCommand();               // run the command
+      if (intState == HIGH)
+      {
+        Serial.print("INTERRUPT: ");
+	Serial.println(lastIrq, HEX);
+	intState = LOW;
+	lastIrq = 0;
+      }
+      else
+      {
+	Serial.print("SENT: ");
+	Serial.println(data, HEX);
+      }
+    }      
+    else
+    {
+	Serial.print("SYNTAX ERROR: ");
+	Serial.println(inputStr);
+    }
+    // clear the string:
+    inputStr = "";
+    serialCmdReady = false;
+  }  
+}
+
+
+
+
+// This routine is called when raybot changes the IRQ line.
+// DO NOT MODIFY if you don't understand arduino interrupts, for ref see:
+// https://www.arduino.cc/en/Reference/AttachInterrupt
+void isr() 
+{
+  intState = !intState;
+  lastIrq = readDataBus();
+  Serial.print("interrupt state: ");
+  Serial.println(intState);
+  Serial.println(lastIrq);
+}
+
+byte readDataBus()
+{
+	byte dataRead = 0;
+	DDRA = B00000000; // set port pins to input
+	dataRead = PINA;
+	DDRA = B11111111; // set port pins to output
+	return dataRead;
+}
+
+// serialEvent() gets called implicitly every loop
+// see: https://www.arduino.cc/en/Tutorial/SerialEvent
+void serialEvent() {
+  while (Serial.available()) {
+    // get the new byte:
+    char inChar = (char)Serial.read();
+    // add it to the inputString:
+    inputStr += inChar;
+    // if the incoming character is a newline, set a flag
+    // so the main loop can do something about it:
+    if (inChar == '\n') {
+      serialCmdReady = true;
+    }
+  }
+}
+
+
+
+
+// Get raybot's system ready to handle a command.
+// This basically sets some pins into the states that
+// get raybot ready to read the address and data bus.
+void prepareForCommand() 
+{
+  digitalWrite(RE,HIGH); 
+  delay(WRITE_DELAY);
+  digitalWrite(VMA,LOW);
+  delay(WRITE_DELAY);
+  digitalWrite(RW,HIGH);
+  delay(WRITE_DELAY);
+}
+
+
+
+
+// Tell raybot's system to commit the command.
+// Set some pins to tell raybot's circuits to consume the address and bus data.
+void runCommand() 
+{
+  delay(WRITE_DELAY);
+  digitalWrite(VMA,HIGH);
+  delay(WRITE_DELAY);
+  digitalWrite(RW,LOW);
+  //Serial.write("sleeping 1s\n");
+  delay(WRITE_DELAY);
+}
+
+
+
+
+void loadCommand (int addr, int data)
+{
+  PORTA = data;
+  PORTC = addr & 0xFF;
+  PORTL = addr >> 8;
+  //printPorts();   
+}
+
+
+
+
+void setAllHigh()
+{
+  PORTA = 0x00;
+  PORTC = 0x00;
+  PORTL = 0xFF;      
+  //printPorts();
+}
+
+
+
+
+void printPorts()
+{
+  Serial.println("Ports loaded with: ");
+  Serial.print("portA: ");
+  Serial.println(PORTA,HEX);
+  
+  Serial.print("portC: ");
+  Serial.println(PORTC, HEX);
+  
+  Serial.print("portL: ");
+  Serial.println(PORTL, HEX);
+}

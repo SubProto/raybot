@@ -1,13 +1,15 @@
 
 #include "Arduino.h"
 
-void isr(); 
+void irq_isr(); 
+void nmi_isr(); 
 void serialEvent();
 void prepareForCommand(); 
 void runCommand();
 void loadCommand(int addr, int data);
 void setAllHigh();
 void printPorts();
+byte readDataBus(byte hi, byte lo);
 
 
 // Haven't reconciled the following 3 comments against the updated wiring - trust at your own risk!
@@ -28,8 +30,12 @@ const byte RW = 5;
 const byte VMA = 6;
 
 
-const byte interruptPin = 2;  // listen for interrupts on raybot on this pin
-volatile byte intState = LOW; // this is the current state of the interrupt
+const byte irqPin = 2;  // listen for interrupts on raybot on this pin
+const byte nmiPin = 3;  // listen for interrupts on raybot on this pin
+volatile byte irqState = LOW; // this is the current state of the interrupt
+volatile byte nmiState = LOW; // this is the current state of the interrupt
+volatile byte lastIrq = 0;
+volatile byte lastNmi = 0;
 
 
 char inBuf[MAX_INPUT_LEN] = {'\0'};      
@@ -40,6 +46,7 @@ String inputStr = "";             // a string to hold incoming data
 boolean serialCmdReady = false;   // whether a serial command is waiting to processs
 
 
+String direction;		  // command prefixed with W or R (write or read)
 String hexStr;                    // keep a hex version of our string 
 long address, data;               // address and data values as converted from hexStr
 
@@ -56,11 +63,15 @@ void setup()
   pinMode(VMA,OUTPUT);
   pinMode(RE,OUTPUT);
  
-  for (int i=22; i < 50; i++) pinMode(i, OUTPUT);
+  // set pinMode for ports all at once:
+  DDRA = B11111111;
+  DDRC = B11111111;
+  DDRL = B11111111;
 
-
-  pinMode(interruptPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(interruptPin), isr, CHANGE);
+  pinMode(irqPin, INPUT_PULLUP);
+  pinMode(nmiPin, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(irqPin), irq_isr, FALLING);
+  attachInterrupt(digitalPinToInterrupt(nmiPin), nmi_isr, FALLING);
   
   inputStr.reserve(256);
   hexStr.reserve(4);
@@ -83,51 +94,104 @@ void loop()
     Serial.print("Caught serial command: ");
     Serial.print(inputStr);
     
-    //if(!(inputStr.length() % 2)) { // make sure is always multipe of 2 - this version for one off cmds
-    if(inputStr.length() == 7) {
-      inputStr[6]='\0';
-      Serial.print("\tDecoded: ");
-      // extract address portion from command and convert to hex value
-      hexStr = inputStr.substring(0,4);
-      //Serial.print("hex string:");
-      //Serial.println(hexStr);
-      address = strtol(&hexStr[0], NULL, 16);
-      Serial.print("address: ");
-      Serial.print(address,HEX);
-      
-      // extract data portion from command and convert to hex value
-      hexStr = inputStr.substring(4,6);
-      //Serial.print("hex string:");
-      //Serial.println(hexStr);  
-      data = strtol(&hexStr[0], NULL, 16);
-      Serial.print(" data: ");
-      Serial.println(data, HEX);  
+    direction = inputStr.substring(0,1); // W or R
+    if (direction == "R")
+    {
+      if(inputStr.length() == 6) {
+      	inputStr[5]='\0';
+        hexStr = inputStr.substring(1,3);
+        byte hi = (byte)strtol(&hexStr[0], NULL, 16);
+        hexStr = inputStr.substring(3,5);
+        byte lo = (byte)strtol(&hexStr[0], NULL, 16);
+	byte out = readDataBus(hi, lo);
+        Serial.print("READ: ");
+        Serial.println(out, HEX);  
+      }
+      else
+      {
+	Serial.print("READ SYNTAX ERROR: ");
+	Serial.println(inputStr);
+      }
+    }
+    else if (direction == "W")
+    {
+      if (inputStr.length() == 8) {
+        inputStr[7]='\0';
+        hexStr = inputStr.substring(1,5);
+        address = strtol(&hexStr[0], NULL, 16);
+        hexStr = inputStr.substring(5,7);
+        data = strtol(&hexStr[0], NULL, 16);
     
-      prepareForCommand();        // Ready raybot to load and read a command
-      loadCommand(address, data); // load the command
-      runCommand();               // run the command
+        prepareForCommand();        // Ready raybot to load and read a command
+        loadCommand(address, data); // load the command
+        runCommand();               // run the command
+        Serial.print("SENT: ");
+        Serial.println(data, HEX);
+      }
+      else
+      {
+	      Serial.print("WRITE SYNTAX ERROR: ");
+	      Serial.println(inputStr);
+      }
     }      
+    else
+    {
+	Serial.print("SYNTAX ERROR: ");
+	Serial.println(inputStr);
+    }
     // clear the string:
     inputStr = "";
     serialCmdReady = false;
-  }  
+  } // end if serialCmdReady
+
+  // check interrupt states
+  if (nmiState == HIGH)
+  {
+	Serial.print("NMI: ");
+	Serial.println(lastNmi, HEX);
+	nmiState = LOW;
+	lastNmi = 0;
+  }
+  if (irqState == HIGH)
+  {
+	Serial.print("IRQ: ");
+	Serial.println(lastIrq, HEX);
+	irqState = LOW;
+	lastIrq = 0;
+  }
 }
-
-
 
 
 // This routine is called when raybot changes the IRQ line.
 // DO NOT MODIFY if you don't understand arduino interrupts, for ref see:
 // https://www.arduino.cc/en/Reference/AttachInterrupt
-void isr() 
+void irq_isr() 
 {
-  intState = !intState;
-  Serial.print("interrupt state: ");
-  Serial.println(intState);
+  irqState = HIGH;
+  //Serial.print("interrupt state: ");
+  //Serial.println(irqState);
 }
 
-
-
+// This routine is called when raybot sets NMI (non-maskable interrupt) low
+void nmi_isr() 
+{
+  nmiState = HIGH;
+  lastNmi = readDataBus(0xD0, 0x03);
+  Serial.print("NMI signal received! Value on data bus: ");
+  Serial.println(lastNmi);
+}
+byte readDataBus(byte hi, byte lo)
+{
+	byte dataRead = 0;
+	DDRA = B00000000; // set port pins to input
+	prepareForCommand();        // Ready raybot to load and read a command
+	PORTC = hi;
+	PORTL = lo;
+	runCommand();               // run the command
+	dataRead = PINA;
+	DDRA = B11111111; // set port pins to output
+	return dataRead;
+}
 
 // serialEvent() gets called implicitly every loop
 // see: https://www.arduino.cc/en/Tutorial/SerialEvent
@@ -184,7 +248,7 @@ void loadCommand (int addr, int data)
   PORTA = data;
   PORTC = addr & 0xFF;
   PORTL = addr >> 8;
-  printPorts();   
+  //printPorts();   
 }
 
 
@@ -195,7 +259,7 @@ void setAllHigh()
   PORTA = 0x00;
   PORTC = 0x00;
   PORTL = 0xFF;      
-  printPorts();
+  //printPorts();
 }
 
 

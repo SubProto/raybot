@@ -9,9 +9,9 @@ if len(sys.argv) != 3:
 	sys.exit()
 
 def getResponse():
-	for x in range(6):
-		s = ser.readline()
-		#print s
+	#for x in range(6):
+	s = ser.readline()
+	#print s
 	return
 
 ser = serial.Serial('/dev/ttyACM0', 115200)
