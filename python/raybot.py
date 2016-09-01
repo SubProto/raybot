@@ -9,29 +9,27 @@ if len(sys.argv) != 3:
 	sys.exit()
 
 def getResponse():
-	for x in range(6):
-		s = ser.readline()
-		#print s
-	return
+    s = ser.readline()
+    print s
 
 ser = serial.Serial('/dev/ttyACM0', 115200)
 s = ser.readline()
 print s
 
-ser.write(b"D02100\n")
+ser.write(b"WD02100\n")
 getResponse()
 
-ser.write(b"D02000\n")
+ser.write(b"WD02000\n")
 getResponse()
 
-ser.write(b"D021%s\n" % sys.argv[1])
+ser.write(b"WD021%s\n" % sys.argv[1])
 getResponse()
 for x in range(int(sys.argv[2]) * 2):
-	ser.write(b"D020%s\n" % sys.argv[1])
+	ser.write(b"WD020%s\n" % sys.argv[1])
 	getResponse()
 	time.sleep(0.5)
 
-ser.write(b"D02100\n")
+ser.write(b"WD02100\n")
 getResponse()
 
 ser.close()

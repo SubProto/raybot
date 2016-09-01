@@ -10,7 +10,6 @@ void loadCommand(int addr, int data);
 void setAllHigh();
 void printPorts();
 byte readDataBus(byte hi, byte lo);
-void writePhoneme(byte phoneme);
 
 
 // Haven't reconciled the following 3 comments against the updated wiring - trust at your own risk!
@@ -122,33 +121,12 @@ void loop()
         address = strtol(&hexStr[0], NULL, 16);
         hexStr = inputStr.substring(5,7);
         data = strtol(&hexStr[0], NULL, 16);
-
-        if (address == 0xd000)
-        {
-          // special handling for Votrax SC-01 chip - VMA/RW not needed:
-          PORTA=byte(data); // Load phoneme code into 0xd000
-          PORTC=0; 
-          PORTL=0xd0; // latch data
-          PORTL=0; // ready for next latch 
-
-          PORTA=1; // Strobe high - bit 1 of 0xd001
-          PORTC=1;
-          PORTL=0xd0;
-          PORTL=0;
-          
-          PORTA=0; // Strobe low
-          PORTC=1;
-          PORTL=0xd0;
-          PORTL=0;
-        }
-        else
-        {
-          prepareForCommand();        // Ready raybot to load and read a command
-          loadCommand(address, data); // load the command
-          runCommand();               // run the command
-          Serial.print("SENT: ");
-          Serial.println(data, HEX);
-        }
+    
+        prepareForCommand();        // Ready raybot to load and read a command
+        loadCommand(address, data); // load the command
+        runCommand();               // run the command
+        Serial.print("SENT: ");
+        Serial.println(data, HEX);
       }
       else
       {
@@ -302,25 +280,4 @@ void printPorts()
   
   Serial.print("portL: ");
   Serial.println(PORTL, HEX);
-}
-
-void writePhoneme(byte phoneme)
-{
-	  // special handling for Votrax SC-01 chip
-          PORTC = 0x00; 
-          prepareForCommand();
-	        PORTA = phoneme; // load data bus
-          PORTC = 0x00; // load addr lo byte first to avoid decoder confusion
-          PORTL = 0xd0; // now addr load hi byte to trigger latch of data bus
-          runCommand();
-	  // data should be latched and ready for SC-01 now, send strobe signal
-
-          prepareForCommand();
-	        PORTA = 1;
-          PORTL = 0x01; 
-          runCommand();
-          prepareForCommand();
-	        PORTA = 0;
-          runCommand();
-	  // return now, control code should wait for IRQ before sending again
 }
