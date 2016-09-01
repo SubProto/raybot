@@ -78,9 +78,6 @@ if len(sys.argv) != 2:
 def waitForIrq():
     while 1:
         s = ser.readline()
-        print "RECV: "
-        print s
-
         if "NMI:" in s:
             print "NMI signal received"
             sys.exit()    

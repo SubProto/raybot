@@ -170,14 +170,14 @@ void loop()
   if (nmiState == HIGH)
   {
 	Serial.print("NMI: ");
-	Serial.println(lastNmi, HEX);
+	//Serial.println(lastNmi, HEX);
 	nmiState = LOW;
 	lastNmi = 0;
   }
   if (irqState == HIGH)
   {
-	Serial.print("IRQ: ");
-	Serial.println(lastIrq, HEX);
+	Serial.println("IRQ: ");
+	//Serial.println(lastIrq, HEX);
 	irqState = LOW;
 	lastIrq = 0;
   }
