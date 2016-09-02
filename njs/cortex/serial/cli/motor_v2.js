@@ -66,7 +66,7 @@ function serialOnOpen()
 
 function serialOnData(data)
 {
-  if(seqStarted) {console.log
+  if(seqStarted) {
     ackSerial = 1;
   }
 
