@@ -44,28 +44,32 @@ var ackSerial   = 0,
     serialUp    = 0,  // serial port is open
     serialData  = 0;  // serial data was read from remote system
 
+if(!program.sim) {
+  var port = new serialport(portName, {
+     baudRate: 115200,
+     // look for return and newline at the end of each data packet:
+     parser: serialport.parsers.readline("\n")
+   });
 
-var port = new serialport(portName, {
-   baudRate: 115200,
-   // look for return and newline at the end of each data packet:
-   parser: serialport.parsers.readline("\n")
- });
+  port.on('open', serialOnOpen);
+  port.on('data', serialOnData);
+  port.on('close', serialOnClose);
+  port.on('error', serialOnErr);
+}
+else runSeq(buildSeq(code, duration));
 
 
-port.on('open', serialOnOpen);
-port.on('data', serialOnData);
-port.on('close', serialOnClose);
-port.on('error', serialOnErr);
 
+// ALL FUNCTION DEFS BELOW
 
-function serialOnOpen()
-{
-   print(ink.itag+' '+portName+' open @: ' + port.options.baudRate + ' '+ink.brkt('OK'.green.bold));
-  //  runSeq(duration);
+function serialOnOpen() {
+  print(ink.itag+' '+portName+' open @: ' + port.options.baudRate + ' '+ink.brkt('OK'.green.bold));
+
+  runSeq(buildSeq(code, duration));
 }
 
-function serialOnData(data)
-{
+
+function serialOnData(data) {
   if(seqStarted) {
     ackSerial = 1;
   }
@@ -86,48 +90,53 @@ function serialOnData(data)
   }
 }
 
+
 function serialOnClose() {
    print(ink.wtag+' port closed.');
 }
+
 
 function serialOnErr(err) {
    print(ink.etag+' serial port error: ' + err);
 }
 
 
-var begSeq  = []; // beginning sequence
-var loopSeq = []; // sequence to loop for durection
-var endSeq  = []; // ending sequence
+function buildSeq(code, duration) {
+  var begSeq  = []; // beginning sequence
+  var loopSeq = []; // sequence to loop for durection
+  var endSeq  = []; // ending sequence
 
-var met = "WD020";
-var mil = "WD021";
+  var met = "WD020";
+  var mil = "WD021";
 
-var clearMet = met + "00";
-var clearMil = mil + "00";
+  var clearMet = met + "00";
+  var clearMil = mil + "00";
 
-begSeq.push(clearMet);
-begSeq.push(clearMil);
-begSeq.push(mil+code);
+  begSeq.push(clearMet);
+  begSeq.push(clearMil);
+  begSeq.push(mil+code);
 
-loopSeq.push(met+code);
+  loopSeq.push(met+code);
 
-endSeq.push(clearMet);
-endSeq.push(clearMil);
+  endSeq.push(clearMet);
+  endSeq.push(clearMil);
 
-var seq = begSeq.concat(loopSeq).concat(endSeq);
+  var seq = {
+    instructions: begSeq.concat(loopSeq).concat(endSeq),
+    duration: duration
+  };
+  // print(seq);
+  return seq;
+}
 
-// print(seq);
 
-
-
-function runSeq()
-{
+function runSeq(seq) {
   seqStarted = 1;
   console.log('Starting command sequence with code: '+code+' for '+duration+' ms');
 
   console.log('Sequence Preview:');
 
-  seq.forEach(function(instruction){
+  seq.instructions.forEach(function(instruction){
     console.log(instruction);
   });
 
@@ -141,15 +150,16 @@ function runSeq()
 }
 
 
-function getNextInstruction(seq, i)
-{
-  if(i !== 3 && i < seq.length) {
-    console.log('Sending: '+seq[i]);
-    port.write(seq[i]+'\n');
+function getNextInstruction(seq, i) {
+  if(program.sim) serialData = 1;
+
+  if(i !== 3 && i < seq.instructions.length) {
+    console.log('Sending: '+seq.instructions[i]);
+    if(!program.sim) port.write(seq.instructions[i]+'\n');
 
     if(serialData) { // increment i and do next instruction
       i++;
-      serialData = 0;
+      if(!program.sim) serialData = 0;
       setTimeout(function() {
         getNextInstruction(seq, i);
       }, delay);
@@ -160,13 +170,13 @@ function getNextInstruction(seq, i)
         getNextInstruction(seq, i);
       }, delay);
     }
-  } else if(i < seq.length){
+  } else if(i < seq.instructions.length){
     if(serialData) {
-      serialData = 0;
+      if(!program.sim) serialData = 0;
       console.log('Looping...');
       timer = setInterval(function() { // run the following command every delay s
-        port.write(seq[i]+'\n');
-        console.log('Sending: '+seq[i]);
+        if(!program.sim) port.write(seq.instructions[i]+'\n');
+        console.log('Sending: '+seq.instructions[i]);
       }, delay);
 
       setTimeout(function() { // interrupt the loop after duration
@@ -186,7 +196,6 @@ function getNextInstruction(seq, i)
 
 
 function ackSerialFlag(callback) {
-
   while(!ackSerial) {
     console.log('.');
     if(ackSerial) break;
@@ -199,8 +208,8 @@ function ackSerialFlag(callback) {
   }
 }
 
-function checkInterrupt()
-{
+
+function checkInterrupt() {
   if(interrupt) {
     clearInterval(timer);
     interrupt = 0;
