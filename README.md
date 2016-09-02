@@ -3,18 +3,14 @@
   - Make an introduction, this one sux
   - Tell the history of Raybot's hardware
   - Witness the history of Raybot's software (it is this repo, so read on)
-  
-Markdown is a lightweight markup language based on the formatting conventions that people naturally use in email.  As [John Gruber] writes on the [Markdown site][df1]
 
 > RayBot's History Space
 > 
 > 
 
-This text you see here is *actually* written in Markdown! To get a feel for Markdown's syntax, type some text into the left window and watch the results in the right.
-
 ### Tech
 
-Dillinger uses a number of open source projects to work properly:
+Raybot uses a number of open source projects to work properly:
 
 * [node.js] - evented I/O for the backend
 * [Express] - fast node.js network app framework [@tjholowaychuk]
