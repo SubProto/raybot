@@ -12,7 +12,6 @@ void printPorts();
 byte readDataBus(byte hi, byte lo);
 void writePhoneme(byte phoneme);
 
-byte activated[] = {0x2b, 0x21, 0x0e, 0x24, 0x2a, 0x03, 0x2f, 0x19, 0x2a, 0x0b, 0x0f, 0x20, 0x2a, 0x3b, 0x1e, 0x3f};
 
 // Haven't reconciled the following 3 comments against the updated wiring - trust at your own risk!
 // Address bus A0 - A7 A8 - A15
@@ -55,6 +54,9 @@ long address, data;               // address and data values as converted from h
 
 void setup() 
 {  
+  // Turn the Serial Protocol ON
+  Serial.begin(115200);
+  Serial.println("Listening for serial commands...");
  
   // Get all the pins in the right state OR IT WONT WORK and many cries.
   // Kudos to fauxtonic for catching this and saving the day!
@@ -68,27 +70,12 @@ void setup()
   DDRL = B11111111;
 
   pinMode(irqPin, INPUT_PULLUP);
+  pinMode(nmiPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(irqPin), irq_isr, FALLING);
+  attachInterrupt(digitalPinToInterrupt(nmiPin), nmi_isr, FALLING);
   
   inputStr.reserve(256);
   hexStr.reserve(4);
-
-  int i;
-  int alen = sizeof(activated);
-  for (i=0; i < alen; i++)
-  {
-    writePhoneme(activated[i]);
-    while (irqState == LOW);
-	  irqState = LOW;
-	  lastIrq = 0;
-    nmiState = LOW;
-    lastNmi = 0;
-  }
-  pinMode(nmiPin, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(nmiPin), nmi_isr, FALLING);
-  // Turn the Serial Protocol ON
-  Serial.begin(115200);
-  Serial.println("Listening for serial commands...");
 }
 
 
@@ -119,7 +106,7 @@ void loop()
         byte lo = (byte)strtol(&hexStr[0], NULL, 16);
 	      byte out = readDataBus(hi, lo);
         Serial.print("READ: ");
-        Serial.println(out);  
+        Serial.println(out, HEX);  
       }
       else
       {
@@ -138,7 +125,21 @@ void loop()
 
         if (address == 0xd000)
         {
-          writePhoneme(byte(data));
+          // special handling for Votrax SC-01 chip - VMA/RW not needed:
+          PORTA=byte(data); // Load phoneme code into 0xd000
+          PORTC=0; 
+          PORTL=0xd0; // latch data
+          PORTL=0; // ready for next latch 
+
+          PORTA=1; // Strobe high - bit 1 of 0xd001
+          PORTC=1;
+          PORTL=0xd0;
+          PORTL=0;
+          
+          PORTA=0; // Strobe low
+          PORTC=1;
+          PORTL=0xd0;
+          PORTL=0;
         }
         else
         {
@@ -169,8 +170,7 @@ void loop()
   if (nmiState == HIGH)
   {
 	Serial.print("NMI: ");
-  Serial.print("Bumper: ");
-	Serial.println(lastNmi, HEX);
+	//Serial.println(lastNmi, HEX);
 	nmiState = LOW;
 	lastNmi = 0;
   }
@@ -198,31 +198,30 @@ void irq_isr()
 void nmi_isr() 
 {
   nmiState = HIGH;
-  lastNmi = readDataBus(0xD0, 0x03);
+  //lastNmi = readDataBus(0xD0, 0x03);
   //Serial.print("NMI signal received!");
   //Serial.println(lastNmi);
 }
 byte readDataBus(byte hi, byte lo)
 {
 	byte dataRead = 0;
-  digitalWrite(RW,LOW); // write mode
-  digitalWrite(VMA,LOW); // prepare for high transition needed by 74LS374
+  PORTA = 0;
 	DDRA = B00000000; // set port pins to input
-	PORTC = lo;
-	PORTL = hi; // address decoder output should be low now
-  digitalWrite(RW,HIGH); // bring RW high to make NAND output low to 74LS374 enable pin
-  digitalWrite(VMA,HIGH); // now transition to high on 74LS374 clock in
-	dataRead = PINA;  // read the data bus contents
+	PORTC = hi;
+	PORTL = lo;
+	prepareForCommand();        // Ready raybot to load and read a command
+	runCommand();               // run the command
+  delay(10);
+	prepareForCommand();        
+	runCommand(); 
+	dataRead = PINA;
 	DDRA = B11111111; // set port pins to output
-  digitalWrite(RW,LOW); // RW returns to LOW, NAND goes high, pin 1 on 74LS374 is now disabled (high impedance)
 	return dataRead;
 }
 
 // serialEvent() gets called implicitly every loop
 // see: https://www.arduino.cc/en/Tutorial/SerialEvent
 void serialEvent() {
-  if (Serial)
-  {
   while (Serial.available()) {
     // get the new byte:
     char inChar = (char)Serial.read();
@@ -233,12 +232,6 @@ void serialEvent() {
     if (inChar == '\n') {
       serialCmdReady = true;
     }
-  }
-  }
-  else
-  {
-    Serial.begin(115200);
-    Serial.println("Listening for serial commands...");
   }
 }
 
@@ -313,20 +306,21 @@ void printPorts()
 
 void writePhoneme(byte phoneme)
 {
-          // special handling for Votrax SC-01 chip
-          PORTA=phoneme; // Load phoneme code into 0xd000
-          PORTC=0; 
-          PORTL=0xd0; // latch data
-          PORTL=0; // ready for next latch 
+	  // special handling for Votrax SC-01 chip
+          PORTC = 0x00; 
+          prepareForCommand();
+	        PORTA = phoneme; // load data bus
+          PORTC = 0x00; // load addr lo byte first to avoid decoder confusion
+          PORTL = 0xd0; // now addr load hi byte to trigger latch of data bus
+          runCommand();
+	  // data should be latched and ready for SC-01 now, send strobe signal
 
-          PORTA=1; // Strobe high - bit 1 of 0xd001
-          PORTC=1;
-          PORTL=0xd0;
-          PORTL=0;
-          
-          PORTA=0; // Strobe low
-          PORTC=1;
-          PORTL=0xd0;
-          PORTL=0;
+          prepareForCommand();
+	        PORTA = 1;
+          PORTL = 0x01; 
+          runCommand();
+          prepareForCommand();
+	        PORTA = 0;
+          runCommand();
 	  // return now, control code should wait for IRQ before sending again
 }

@@ -1,0 +1,32 @@
+{
+  "name": "cortex-serial",
+  "version": "0.1.0",
+  "description": "Serial interface to Raybot motor subsystem.",
+  "main": "main.js",
+  "dependencies": {
+    "colors": "^1.1.2",
+    "serialport": "^4.0.1"
+  },
+  "devDependencies": {
+    "colors": "^1.1.2",
+    "commander": "^2.9.0",
+    "serialport": "^4.0.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/subproto/raybot"
+  },
+  "keywords": [
+    "robot",
+    "robotics",
+    "ai",
+    "motor",
+    "serial",
+    "raybot"
+  ],
+  "author": "fetter",
+  "license": "ISC"
+}
