@@ -14,9 +14,7 @@ Raybot uses a number of open source projects to work properly:
 
 * [node.js] - evented I/O for the backend
 * [Express] - fast node.js network app framework [@tjholowaychuk]
-
-And of course Dillinger itself is open source with a [public repository][dill]
- on GitHub.
+* python - TODO add python reference material
 
 ### Installation
 
@@ -28,13 +26,7 @@ $ npm install -d
 $ node app
 ```
 
-For production environments...
 
-```sh
-$ npm install --production
-$ npm run predeploy
-$ NODE_ENV=production node app
-```
 
 ### Plugins
 
@@ -58,7 +50,6 @@ License
 MIT
 
 
-**Free Software, Hell Yeah!**
 
 [//]: # (These are reference links used in the body of this note and get stripped out when the markdown processor does its job. There is no need to format nicely because it shouldn't be seen. Thanks SO - http://stackoverflow.com/questions/4823468/store-comments-in-markdown-syntax)
 
