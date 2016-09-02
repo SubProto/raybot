@@ -1,5 +1,7 @@
 
 # RayBot
+
+### Todos
   - Make an introduction, this one sux
   - Tell the history of Raybot's hardware
   - Witness the history of Raybot's software (it is this repo, so read on)
@@ -39,10 +41,6 @@ Raybot isn't currently extended with the following plugins
 
 Want to contribute? Great!
 
-
-### Todos
-
- - See Above
 
 License
 ----
