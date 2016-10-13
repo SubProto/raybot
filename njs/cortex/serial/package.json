@@ -1,6 +1,7 @@
 {
+
   "name": "cortex-serial",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "Serial interface to Raybot motor subsystem.",
   "main": "main.js",
   "dependencies": {
