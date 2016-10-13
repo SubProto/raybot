@@ -87,15 +87,18 @@ if len(sys.argv) != 2:
 def waitForIrq():
     while 1:
         s = ser.readline()
-        print "RECV: "
-        print s
+        #print "RECV: "
+        #print s
 
         if "NMI:" in s:
             print "NMI signal received"
             sys.exit()    
-        if "IRQ:" in s:
-            print "IRQ signal received"
+        if "IRQ: LOW" in s:
+            print "IRQ LOW signal received"
             return
+        if "IRQ: HIGH" in s:
+            print "IRQ HIGH signal received"
+            #return
 
 ser = serial.Serial(sys.argv[1], 115200, timeout=5)
 s = ser.readline()

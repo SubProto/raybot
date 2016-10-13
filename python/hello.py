@@ -69,7 +69,11 @@ ph = {'EH3': '00',
 'PA1': '3E',
 'STOP': '3F'}
 
+# fetter greeting
 p1 = ['F', 'UH1', 'UH2', 'K', 'PA0', 'Y1', 'IU', 'U1', 'U1', 'PA1', 'F', 'EH1', 'EH3', 'T', 'ER']
+
+# lori greeting
+#p1 = ['H', 'EH1', 'UH3', 'L', 'UH3', 'O1', 'U1', 'PA1','L', 'O1', 'U1', 'R', 'E1', 'Y']
 
 if len(sys.argv) != 2:
 	print "Usage: %s <serial port>" % sys.argv[0]
@@ -80,13 +84,15 @@ def waitForIrq():
         s = ser.readline()
         print "RECV: "
         print s
-
         if "NMI:" in s:
             print "NMI signal received"
             sys.exit()    
-        if "IRQ:" in s:
-            print "IRQ signal received"
+        if "IRQ: LOW" in s:
+            print "IRQ LOW signal received"
             return
+        #if "IRQ: HIGH" in s:
+        #    print "IRQ HIGH signal received"
+        #    return
 
 ser = serial.Serial(sys.argv[1], 115200, timeout=5)
 s = ser.readline()

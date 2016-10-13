@@ -65,7 +65,7 @@ else runSeq(buildSeq(code, duration));
 function serialOnOpen() {
   print(ink.itag+' '+portName+' open @: ' + port.options.baudRate + ' '+ink.brkt('OK'.green.bold));
 
-  runSeq(buildSeq(code, duration));
+  // runSeq(buildSeq(code, duration));
 }
 
 
@@ -87,6 +87,12 @@ function serialOnData(data) {
   }
   else if(data.indexOf("Listening for serial commands...") > -1) {
     serialUp = 1;
+
+    // port.write('RD012\n');
+
+    runSeq(buildSeq(code, duration));
+
+    // port.write('RD012\n');
   }
 }
 
@@ -115,9 +121,11 @@ function buildSeq(code, duration) {
   begSeq.push(clearMet);
   begSeq.push(clearMil);
   begSeq.push(mil+code);
+  // begSeq.push('RD012');
 
   loopSeq.push(met+code);
 
+  // endSeq.push('RD012');
   endSeq.push(clearMet);
   endSeq.push(clearMil);
 
@@ -175,7 +183,10 @@ function getNextInstruction(seq, i) {
       if(!program.sim) serialData = 0;
       console.log('Looping...');
       timer = setInterval(function() { // run the following command every delay s
-        if(!program.sim) port.write(seq.instructions[i]+'\n');
+        if(!program.sim) {
+          port.write(seq.instructions[i]+'\n');
+          // port.write('RD012\n');
+        }
         console.log('Sending: '+seq.instructions[i]);
       }, delay);
 

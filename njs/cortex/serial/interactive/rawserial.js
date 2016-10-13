@@ -1,12 +1,13 @@
 
 // TODO: use event handlers to manage arrival of serial data
 
-var sys = require('../req');
+var sys = require('../lib/req');
 var req = sys.req;
 var ink = sys.ink;
 
 var serialport = req('serialport');
 var program    = req('commander');
+var readline   = req('readline');
 
 sys.ready('M O T O R  C O R T E X   I N I T I A L I Z E D');
 
@@ -54,8 +55,6 @@ if(!program.sim) {
      parser: serialport.parsers.readline("\n")
    });
 
-console.log();
-
   port.on('open', serialOnOpen);
   port.on('data', serialOnData);
   port.on('close', serialOnClose);
@@ -90,13 +89,13 @@ function serialOnData(data) {
     print(ink.wtag+' CAUGHT NMI'.red.bold);
     interrupt = 1;
 
-    if(looping) { // clear the timer
-      looping = 0;
-      clearInterval(timer);
-      clearInterval(endLoopTimer);
-      // clean up
-      getNextInstruction(seq,++seq.current);
-    }
+    // if(looping) { // clear the timer
+    //   looping = 0;
+    //   clearInterval(timer);
+    //   clearInterval(endLoopTimer);
+    //   // clean up
+    //   getNextInstruction(seq,++seq.current);
+    // }
   }
   else if(data.indexOf("Listening for serial commands...") > -1) {
     serialUp = 1;

@@ -21,15 +21,15 @@ port.on('error', showError);
 function showPortOpen() {
    console.log('port open. Data rate: ' + port.options.baudRate);
 }
- 
+
 function sendSerialData(data) {
    console.log(data);
 }
- 
+
 function showPortClose() {
    console.log('port closed.');
 }
- 
+
 function showError(error) {
    console.log('Serial port error: ' + error);
 }
@@ -43,5 +43,5 @@ var rl = readline.createInterface({
 
 rl.on('line', function(line){
   console.log(line);
-  port.write(line+'\n'); 
-})
+  port.write(line+'\n');
+});

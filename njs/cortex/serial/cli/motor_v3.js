@@ -21,7 +21,7 @@ program
   .option('-s, --sim', "Don't send to serial port, only simulate")
   .parse(process.argv);
 
-if(program.args.length !== 3) program.help();
+if(program.args.length !== 1) program.help();
 
 if (program.sim) {
   print(ink.wtag+' SIMULATING'.yellow.bold);
@@ -35,13 +35,10 @@ code      = process.argv[3];        // code to write to motors
 duration  = process.argv[4] * 1000; // how long to loop the code
 
 
-var seq;
-
-var timer, endLoopTimer;
+var timer;
 var delay = 500;
 
 var ackSerial   = 0,
-    looping     = 0, // are we in the loop?
     interrupt   = 0,
     seqStarted  = 0,
     serialUp    = 0,  // serial port is open
@@ -53,8 +50,6 @@ if(!program.sim) {
      // look for return and newline at the end of each data packet:
      parser: serialport.parsers.readline("\n")
    });
-
-console.log();
 
   port.on('open', serialOnOpen);
   port.on('data', serialOnData);
@@ -82,26 +77,22 @@ function serialOnData(data) {
   serialData = 1;
 
   // console.log('serial response: '+data);
-  print(ink.brkt('RECV'.magenta.bold)+' '+data);
+  print(ink.brkt('RECV'.green.bold)+' '+data);
 
   // console.log('serial data: '+data+'\nackSerial: '+ackSerial);
 
   if(data.indexOf("NMI:") > -1) {
-    print(ink.wtag+' CAUGHT NMI'.red.bold);
+    print(ink.wtag+' caught interrupt');
     interrupt = 1;
-
-    if(looping) { // clear the timer
-      looping = 0;
-      clearInterval(timer);
-      clearInterval(endLoopTimer);
-      // clean up
-      getNextInstruction(seq,++seq.current);
-    }
   }
   else if(data.indexOf("Listening for serial commands...") > -1) {
     serialUp = 1;
 
-    runSeq(buildSeq(code, duration));
+    // port.write('RD012\n');
+
+//    runSeq(buildSeq(code, duration));
+
+    // port.write('RD012\n');
   }
 }
 
@@ -138,10 +129,9 @@ function buildSeq(code, duration) {
   endSeq.push(clearMet);
   endSeq.push(clearMil);
 
-  seq = {
+  var seq = {
     instructions: begSeq.concat(loopSeq).concat(endSeq),
-    duration: duration,
-    current: 0
+    duration: duration
   };
   // print(seq);
   return seq;
@@ -160,30 +150,30 @@ function runSeq(seq) {
 
   console.log('END.');
 
-  console.log(ink.brkt('SEQUENCER'.blue.bold)+' EXECUTING...');
+  console.log('EXECUTING...');
 
   var i = 0;
 
   getNextInstruction(seq, i);
 }
 
-// TODO: git rid of i since now tracking in seq.current
+
 function getNextInstruction(seq, i) {
   if(program.sim) serialData = 1;
 
   if(i !== 3 && i < seq.instructions.length) {
-    console.log(ink.brkt('SEND'.green.bold)+' '+seq.instructions[i]);
+    console.log('Sending: '+seq.instructions[i]);
     if(!program.sim) port.write(seq.instructions[i]+'\n');
 
     if(serialData) { // increment i and do next instruction
-      seq.current = ++i;
+      i++;
       if(!program.sim) serialData = 0;
       setTimeout(function() {
         getNextInstruction(seq, i);
       }, delay);
     }
     else { // keep running until serialData has arrived
-      console.log(ink.wtag+' Waiting for command receipt confirmation');
+      console.log('Waiting for command receipt confirmation');
       setTimeout(function() {
         getNextInstruction(seq, i);
       }, delay);
@@ -191,28 +181,23 @@ function getNextInstruction(seq, i) {
   } else if(i < seq.instructions.length){
     if(serialData) {
       if(!program.sim) serialData = 0;
-      console.log(ink.brkt('SEQUENCER'.blue.bold)+' Looping...');
-      looping = 1;
+      console.log('Looping...');
       timer = setInterval(function() { // run the following command every delay s
         if(!program.sim) {
           port.write(seq.instructions[i]+'\n');
           // port.write('RD012\n');
         }
-        //console.log('Sending: '+seq.instructions[i]);
-        console.log(ink.brkt('SEND'.green.bold)+' '+seq.instructions[i]);
+        console.log('Sending: '+seq.instructions[i]);
       }, delay);
 
-      endLoopTimer = setTimeout(function() { // interrupt the loop after duration
-        if(looping) {
-          clearInterval(timer);
-          console.log('loop cleared');
-          looping = 0;
-          getNextInstruction(seq, ++i);
-        }
+      setTimeout(function() { // interrupt the loop after duration
+        clearInterval(timer);
+        console.log('loop cleared');
+        getNextInstruction(seq, ++i);
       }, duration);
     }
     else {
-      console.log(ink.wtag+' Waiting for command receipt confirmation');
+      console.log('Waiting for command receipt confirmation');
       setTimeout(function() {
         getNextInstruction(seq, i);
       }, delay);
