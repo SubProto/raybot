@@ -89,13 +89,13 @@ function serialOnData(data) {
     print(ink.wtag+' CAUGHT NMI'.red.bold);
     interrupt = 1;
 
-     if(looping) { // clear the timer
-       looping = 0;
-       clearInterval(timer);
-       clearInterval(endLoopTimer);
-       // clean up
-       getNextInstruction(seq,++seq.current);
-     }
+    // if(looping) { // clear the timer
+    //   looping = 0;
+    //   clearInterval(timer);
+    //   clearInterval(endLoopTimer);
+    //   // clean up
+    //   getNextInstruction(seq,++seq.current);
+    // }
   }
   else if(data.indexOf("Listening for serial commands...") > -1) {
     serialUp = 1;
@@ -204,7 +204,7 @@ function getNextInstruction(seq, i) {
       endLoopTimer = setTimeout(function() { // interrupt the loop after duration
         if(looping) {
           clearInterval(timer);
-          console.log(ink.brkt('loop cleared'.red.bold));
+          console.log('loop cleared');
           looping = 0;
           getNextInstruction(seq, ++i);
         }
